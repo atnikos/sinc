@@ -10,6 +10,7 @@
     </a>
     <a href='https://sinc.is.tue.mpg.de/' style='padding-left: 0.5rem;'>
     <img src='https://img.shields.io/badge/Project-Page-blue?style=flat&logo=Google%20chrome&logoColor=blue' alt='Project Page'>
+    <a href="https://huggingface.co/spaces/atnikos/sinc-synthetic"  style='padding-left: 0.5rem;'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-orange'></a>
   </h1>
   <p align="center">
     <a href="https://ps.is.mpg.de/person/nathanasiou"><strong>Nikos Athanasiou*</strong></a>
@@ -34,6 +35,10 @@
 <!-- | Paper Video                                                                                                | Qualitative Results                                                                                                |
 |------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
 | [![PaperVideo](https://img.youtube.com/vi/vidid/0.jpg)](https://www.youtube.com/) | -->
+
+## Sinc Synthetic Data
+You can download a version of the [sinc synthetic data here](https://drive.google.com/drive/folders/1ks9wvNN_arrgBcd0GxN5nRLf5ASPkUgc?usp=sharing)!
+There is also a demo to explore the in [Hugging Face 🤗](https://huggingface.co/spaces/atnikos/sinc-synthetic)!
 
 ## Features
 
