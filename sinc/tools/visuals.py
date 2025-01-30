@@ -1,5 +1,4 @@
-# copilot 
-import os 
+import os
 import sys
 from sinc.tools.transform3d import transform_body_pose
 import torch
@@ -106,8 +105,7 @@ def render_motion(renderer: HeadlessRenderer, datum: dict,
         renderer.scene.add(smpl_template)
     # camera follows smpl sequence
     # FIX CAMERA
-    from sinc.tools.transform3d import get_z_rot, transform_body_pose
-
+    from sinc.tools.transform3d import get_z_rot
     R_z = get_z_rot(global_orient[0], in_format='aa')
     heading = -R_z[:, 1]
     xy_facing = body_transl[0] + heading*2.5
