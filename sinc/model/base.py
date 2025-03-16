@@ -124,7 +124,6 @@ class BaseModel(LightningModule):
         
         optim_dict['optimizer'] = optimizer
         # if self.hparams.NAME
-        import ipdb; ipdb.set_trace()
         if self.hparams.modelname != 'Mld_VAE_actor':
             if self.hparams.lr_scheduler == 'reduceonplateau':
                 optim_dict['lr_scheduler'] = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=1e-3)
