@@ -100,12 +100,12 @@ class BaseModel(LightningModule):
         dico.update({"epoch": float(self.trainer.current_epoch),
                      "step": float(self.trainer.global_step)})
 
-        if split == "val":
-            metrics_dict = self.metrics.compute()
-            dico.update({f"Metrics/{metric}": value for metric, value in metrics_dict.items() if '_mean_' in metric})
-            if 'Temos_Score' in metrics_dict:
-                dico.update({f"Metrics/Temos_Score": metrics_dict['Temos_Score']})
-        self.log_dict(dico, on_epoch=True, sync_dist=True)
+        #if split == "val":
+        #    metrics_dict = self.metrics.compute()
+        #    dico.update({f"Metrics/{metric}": value for metric, value in metrics_dict.items() if '_mean_' in metric})
+        #    if 'Temos_Score' in metrics_dict:
+        #        dico.update({f"Metrics/Temos_Score": metrics_dict['Temos_Score']})
+        #self.log_dict(dico, on_epoch=True, sync_dist=True)
         return 
 
     def on_train_epoch_end(self):
@@ -119,12 +119,13 @@ class BaseModel(LightningModule):
 
     def configure_optimizers(self):
         optim_dict = {}
-        import ipdb; ipdb.set_trace()
-        optimizer = torch.optim.AdamW(lr=self.hparams.cfg.TRAIN.OPTIM.LR, params=self.parameters())
+        # import ipdb; ipdb.set_trace()
+        optimizer = torch.optim.AdamW(lr=self.hparams.optim.lr, params=self.parameters())
         
         optim_dict['optimizer'] = optimizer
-        # if self.hparams.NAME 
-        if self.hparams.cfg.NAME != 'Mld_VAE_actor':
+        # if self.hparams.NAME
+        import ipdb; ipdb.set_trace()
+        if self.hparams.modelname != 'Mld_VAE_actor':
             if self.hparams.lr_scheduler == 'reduceonplateau':
                 optim_dict['lr_scheduler'] = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=1e-3)
                 optim_dict['monitor'] = 'losses/total/train'

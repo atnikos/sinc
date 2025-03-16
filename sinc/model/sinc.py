@@ -45,7 +45,7 @@ class SINC(BaseModel):
         self.transforms = instantiate(transforms)
         self.Datastruct = self.transforms.Datastruct
         self.motiondecoder = instantiate(motiondecoder, nfeats=nfeats)
-        # self.metrics = ComputeMetricsSinc(eval_model)
+        #self.metrics = ComputeMetricsSinc(eval_model)
 
         self.nvids_to_save = nvids_to_save
         # If we want to overide it at testing time
@@ -483,10 +483,10 @@ class SINC(BaseModel):
                                                        bp_list_text=bp_list_text,
                                                        bp_list_motion=bp_list_motion)
 
-        if split == 'val':
-            self.metrics(gt_motion_feats.detach(),
-                         datastruct_from_text.detach(),
-                         gt_lens)
+        #if split == 'val':
+            #self.metrics(gt_motion_feats.detach(),
+        #                datastruct_from_text.detach(),
+        #                 gt_lens)
 
         # self.tracker[split].update(loss_dict)
         for k, v in loss_dict.items():
