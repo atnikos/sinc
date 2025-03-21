@@ -7,7 +7,7 @@ datapath: ${path.data}/babel/babel-smplh-30fps-male
 gpt_path: ${path.deps}/gpt/gpt3-labels-list.json
 
 # Amass
-smplh_path: ${path.data}/body_models_expose/smplh
+smplh_path: ${path.data}/smpl_models/smplh
 load_with_rot: true
 synthetic: false
 
