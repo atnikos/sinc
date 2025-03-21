@@ -105,6 +105,8 @@ class BABEL(Dataset):
                  dtype: str = '',
                  mode: str = 'train',
                  simultaneous_max: int = 2,
+                 precomputed: bool = False,
+                 precomputed_path: str = None,
                  **kwargs):
         self.simultaneous_max = simultaneous_max
         self.split = split
@@ -119,6 +121,7 @@ class BABEL(Dataset):
         self.random_synthetic = random_synthetic
         self.walk_only = walk_only
         self.kit_only = kit_only
+        self.precomputed = precomputed
         self.centered_compositions = centered_compositions
         if not self.load_with_rot:
             self.transforms_xyz = deepcopy(transforms_xyz)
@@ -322,24 +325,43 @@ class BABEL(Dataset):
                             # bp_list = text_to_bp(a_t, gpt_labels_full_sent)
                             gpt_labels[keyid].append(bp_list)
         if synthetic:
-            # from a keyid, prepare what keyids is possible to be chosen
-            from sinc.info.joints import get_compat_matrix
-            self.compat_matrix = get_compat_matrix(gpt_labels_full_sent)
+            if precomputed:
+                import ipdb;ipdb.set_trace()
+                precomputed_synth_data_raw = joblib.load(precomputed_path)
+                motion_data_synth = {}
+                texts_data_synth = {}
+                durations_synth = {}
+                for k, v in precomputed_synth_data_raw.items():
+                    smpl_data_for_synth = {
+                                "poses":v['motion_combo']['rots'].float(),
+                                "trans":v['motion_combo']['trans'].float()
+                    }
+                    from sinc.data.tools.smpl import smpl_data_to_matrix_and_trans
+                    smpl_data = smpl_data_to_matrix_and_trans(smpl_data_for_synth,
+                                                              nohands=True)
+                    features = self.transforms.rots2rfeats(smpl_data)
+                    motion_data_synth[k] = features
+                    texts_data_synth[k] = v['motion_combo']['text']
+                    durations_synth[k] = features.shape[0]
+            else:
+                # from a keyid, prepare what keyids is possible to be chosen
+                from sinc.info.joints import get_compat_matrix
+                self.compat_matrix = get_compat_matrix(gpt_labels_full_sent)
 
-            from collections import defaultdict
-            self.keyids_from_text = defaultdict(list)
+                from collections import defaultdict
+                self.keyids_from_text = defaultdict(list)
 
-            self.compat_seqs = {}
-            for key, val in texts_data.items():
-                if "seq" not in key and "seg" not in key:
-                    continue
-                self.keyids_from_text[val[0]].append(key)
+                self.compat_seqs = {}
+                for key, val in texts_data.items():
+                    if "seq" not in key and "seg" not in key:
+                        continue
+                    self.keyids_from_text[val[0]].append(key)
 
-            for key, val in texts_data.items():
-                self.compat_seqs[key] = [
-                    y for x in self.compat_matrix[val[0]]
-                    for y in self.keyids_from_text[x]
-                ]
+                for key, val in texts_data.items():
+                    self.compat_seqs[key] = [
+                        y for x in self.compat_matrix[val[0]]
+                        for y in self.keyids_from_text[x]
+                    ]
         if split != "test" and not tiny:
             if 'spatial_pairs' in self.dtype:
                 total = valid_data_len
@@ -402,6 +424,11 @@ class BABEL(Dataset):
         self.pairs_keyids = [x for x in self.keyids if "spatial_pairs" in x]
         self.sample_dtype = dtypes
         self.gpt_labels = gpt_labels
+        if precomputed:
+            self.motion_data_synth = motion_data_synth
+            self.texts_data_synth = texts_data_synth
+            self._num_frames_in_sequence = durations_synth
+
         # from hydra.utils import get_original_cwd
         # ddict = {}
         # for k, v in texts_data.items():
@@ -474,7 +501,10 @@ class BABEL(Dataset):
 
     def load_keyid(self, keyid, mode='train', proportion=None):
         proportion = proportion if proportion is not None else self.proportion_synthetic
+        import ipdb;ipdb.set_trace()
 
+        # if self.precomputed_path is None:
+        # else:
         # force composition in loading
         force_comp = False
         if "synth" in keyid:
@@ -503,24 +533,6 @@ class BABEL(Dataset):
                         text_p = self._load_text(keyid_p)
                         feats = self.motion_data[keyid]
                         feats_p = self.motion_data[keyid_p]
-                        # make sure trasnform is on the correct device 
-                        # self.transforms.rots2rfeats = self.transforms.rots2rfeats.to(feats.device)
-                        
-                        # smpl_data = self.transforms.rots2rfeats.inverse(feats)
-                        # smpl_data_p = self.transforms.rots2rfeats.inverse(feats_p)
-                        # import ipdb; ipdb.set_trace()
-                        
-                        # if smpl_data.rots.isnan().any() or smpl_data.rots.max() > 1000000 or smpl_data.rots.min() < -1000000:
-                        #     # torch.save(smpl_data.rots, f'{keyid}--{keyid_p}--smpl_data_poses.pt')
-                        #     # torch.save(smpl_data.trans, f'{keyid}--{keyid_p}--smpl_data_trans.pt')
-                        #     isnan = True
-                        # if smpl_data_p.rots.isnan().any() or smpl_data_p.rots.max() > 1000000 or smpl_data_p.rots.min() < -1000000:
-                        #     # torch.save(feats_p, f'{keyid}--{keyid_p}--feats_p.pt')
-                        #     # torch.save(feats, f'{keyid}--{keyid_p}--feats.pt')
-
-                        #     # torch.save(smpl_data_p.rots, f'{keyid}--{keyid_p}--smpl_data_p_poses.pt')
-                        #     # torch.save(smpl_data_p.trans, f'{keyid}--{keyid_p}--smpl_data_p_trans.pt')
-                        #     isnan = True
 
                         if self.random_synthetic:
                             bp = list(np.random.randint(0, 2, 6))
@@ -529,28 +541,6 @@ class BABEL(Dataset):
                             bp = self.gpt_labels[keyid][0]
                             bp_p = self.gpt_labels[keyid_p][0]
 
-                        # from sinc.tools.frank import combine_motions
-                        # smpl_comb = combine_motions(smpl_data, smpl_data_p, 
-                        #                             bp, bp_p, 
-                        #                             center=self.centered_compositions)
-                        # if smpl_comb.rots.isnan().any() or smpl_comb.rots.max() > 1000000 or smpl_comb.rots.min() < -1000000:
-                        #     isnan = True
-                            # torch.save(smpl_comb.rots, f'{keyid}--{keyid_p}--smpl_comb.pt')
-
-                        # feats_comb = self.transforms.rots2rfeats(smpl_comb)
-
-                        # if feats_comb.isnan().any() or feats_comb.max() > 1000000 or feats_comb.min() < -1000000:
-                        #     isnan = True
-                            # torch.save(feats_comb, f'{keyid}--{keyid_p}--feats_comb.pt')
-
-                        # if isnan:
-                        #     continue
-                        # num_frames = len(feats_comb)
-                        # frame_ix = self.sampler(num_frames)
-                        # features = feats_comb[frame_ix]
-                        # datastruct = self.transforms.Datastruct(features=features)
-                        # bp = [0,1,1,0,0,0]
-                        # bp_p = [0,1,1,0,0,0]
                         num_frames = self._num_frames_in_sequence[keyid]
                         frame_ix = self.sampler(num_frames)
                         datastruct = self._load_datastruct(keyid, frame_ix)
