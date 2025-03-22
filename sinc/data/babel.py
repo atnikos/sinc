@@ -326,12 +326,12 @@ class BABEL(Dataset):
                             gpt_labels[keyid].append(bp_list)
         if synthetic:
             if precomputed:
-                import ipdb;ipdb.set_trace()
+                # import ipdb;ipdb.set_trace()
                 precomputed_synth_data_raw = joblib.load(precomputed_path)
                 motion_data_synth = {}
                 texts_data_synth = {}
                 durations_synth = {}
-                for k, v in precomputed_synth_data_raw.items():
+                for k, v in tqdm(precomputed_synth_data_raw.items()):
                     smpl_data_for_synth = {
                                 "poses":v['motion_combo']['rots'].float(),
                                 "trans":v['motion_combo']['trans'].float()
@@ -341,7 +341,7 @@ class BABEL(Dataset):
                                                               nohands=True)
                     features = self.transforms.rots2rfeats(smpl_data)
                     motion_data_synth[k] = features
-                    texts_data_synth[k] = v['motion_combo']['text']
+                    texts_data_synth[k] = v['text']
                     durations_synth[k] = features.shape[0]
             else:
                 # from a keyid, prepare what keyids is possible to be chosen
@@ -424,10 +424,25 @@ class BABEL(Dataset):
         self.pairs_keyids = [x for x in self.keyids if "spatial_pairs" in x]
         self.sample_dtype = dtypes
         self.gpt_labels = gpt_labels
+        
+        # Pre-compute synthetic and non-synthetic indices
+        self.synth_indices = [i for i, keyid in enumerate(self._split_index) if keyid.startswith('sin_synth')]
+        self.non_synth_indices = [i for i, keyid in enumerate(self._split_index) if not keyid.startswith('sin_synth')]
+        
         if precomputed:
-            self.motion_data_synth = motion_data_synth
-            self.texts_data_synth = texts_data_synth
-            self._num_frames_in_sequence = durations_synth
+            # Merge all dictionaries
+            self.motion_data.update(motion_data_synth)
+            self.texts_data.update(texts_data_synth)
+            self._num_frames_in_sequence.update(durations_synth)
+            # Update split index to include synthetic data
+            self._split_index = list(self.motion_data.keys())
+            # Update keyids to include synthetic data
+            self.keyids = list(self.motion_data.keys())
+            self.single_keyids = [x for x in self.keyids if "spatial_pairs" not in x]
+            self.pairs_keyids = [x for x in self.keyids if "spatial_pairs" in x]
+            # Update synthetic and non-synthetic indices
+            self.synth_indices = [i for i, keyid in enumerate(self._split_index) if keyid.startswith('sin_synth')]
+            self.non_synth_indices = [i for i, keyid in enumerate(self._split_index) if not keyid.startswith('sin_synth')]
 
         # from hydra.utils import get_original_cwd
         # ddict = {}
@@ -501,75 +516,93 @@ class BABEL(Dataset):
 
     def load_keyid(self, keyid, mode='train', proportion=None):
         proportion = proportion if proportion is not None else self.proportion_synthetic
-        import ipdb;ipdb.set_trace()
+        # import ipdb;ipdb.set_trace()
 
         # if self.precomputed_path is None:
         # else:
         # force composition in loading
-        force_comp = False
-        if "synth" in keyid:
-            keyid, keyid_p = keyid.split("synth_")[1].split("_")
-            force_comp = True
-        isnan =  True
+        if not self.precomputed:
+
+            force_comp = False
+            if "synth" in keyid:
+                keyid, keyid_p = keyid.split("synth_")[1].split("_")
+                force_comp = True
+            isnan =  True
         text = self._load_text(keyid)
 
         if mode == 'train':
-            if self.sample_dtype[keyid] in ['seg', 'seq', '', 'spatial_pairs']:
-                check_compat = self.synthetic and self.sample_dtype[keyid] in ['seg', 'seq'] and (self.compat_seqs[keyid] or self.random_synthetic)
-                if np.random.uniform() < proportion and check_compat:
-                    # GPT CASE
-                    while isnan:
-                        isnan = False
-                        # check compatibility with synthetic
-                        # randomly do synthetic data or not
-                        # if there is some compatibility
-                        # take a random pair
-                        if not force_comp:
+            if self.precomputed:
+                num_frames = self._num_frames_in_sequence[keyid]
+                frame_ix = self.sampler(num_frames)
+                datastruct = self._load_datastruct(keyid, frame_ix)                    
+                element = {
+                    'datastruct': self.motion_data[keyid][frame_ix],
+                    'text': text,
+                    'length': len(datastruct),
+                    'keyid': keyid,
+                    'bp-gpt': self.gpt_labels[keyid],
+                    'datastruct_a': self.motion_data[keyid][frame_ix],
+                    'datastruct_b': self.motion_data[keyid][frame_ix],
+                    'frames_ix': frame_ix,
+                }
+
+            else:
+                if self.sample_dtype[keyid] in ['seg', 'seq', '', 'spatial_pairs']:
+                    check_compat = self.synthetic and self.sample_dtype[keyid] in ['seg', 'seq'] and (self.compat_seqs[keyid] or self.random_synthetic)
+                    if np.random.uniform() < proportion and check_compat:
+                        # GPT CASE
+                        while isnan:
+                            isnan = False
+                            # check compatibility with synthetic
+                            # randomly do synthetic data or not
+                            # if there is some compatibility
+                            # take a random pair
+                            if not force_comp:
+                                if self.random_synthetic:
+                                    keyid_p = np.random.choice(self.single_keyids)
+                                else:
+                                    keyid_p = np.random.choice(self.compat_seqs[keyid])
+
+                            text_p = self._load_text(keyid_p)
+                            feats = self.motion_data[keyid]
+                            feats_p = self.motion_data[keyid_p]
+
                             if self.random_synthetic:
-                                keyid_p = np.random.choice(self.single_keyids)
+                                bp = list(np.random.randint(0, 2, 6))
+                                bp_p = list(np.random.randint(0, 2, 6))
                             else:
-                                keyid_p = np.random.choice(self.compat_seqs[keyid])
+                                bp = self.gpt_labels[keyid][0]
+                                bp_p = self.gpt_labels[keyid_p][0]
 
-                        text_p = self._load_text(keyid_p)
-                        feats = self.motion_data[keyid]
-                        feats_p = self.motion_data[keyid_p]
+                            num_frames = self._num_frames_in_sequence[keyid]
+                            frame_ix = self.sampler(num_frames)
+                            datastruct = self._load_datastruct(keyid, frame_ix)
 
-                        if self.random_synthetic:
-                            bp = list(np.random.randint(0, 2, 6))
-                            bp_p = list(np.random.randint(0, 2, 6))
-                        else:
-                            bp = self.gpt_labels[keyid][0]
-                            bp_p = self.gpt_labels[keyid_p][0]
-
+                            element = {'datastruct': self.motion_data[keyid][frame_ix],
+                                    'text': (text[0], text_p[0]),
+                                    'length': len(datastruct),
+                                    'keyid': f"synth_{keyid}_{keyid_p}",
+                                    'bp-gpt': [bp, bp_p],
+                                    'datastruct_a': feats,
+                                    'datastruct_b': feats_p,
+                                    'frames_ix': frame_ix,
+                                    }
+                    else:
                         num_frames = self._num_frames_in_sequence[keyid]
                         frame_ix = self.sampler(num_frames)
-                        datastruct = self._load_datastruct(keyid, frame_ix)
-
-                        element = {'datastruct': self.motion_data[keyid][frame_ix],
-                                   'text': (text[0], text_p[0]),
-                                   'length': len(datastruct),
-                                   'keyid': f"synth_{keyid}_{keyid_p}",
-                                   'bp-gpt': [bp, bp_p],
-                                   'datastruct_a': feats,
-                                   'datastruct_b': feats_p,
-                                   'frames_ix': frame_ix,
-                                   }
+                        datastruct = self._load_datastruct(keyid, frame_ix)                    
+                        element = {
+                            'datastruct': self.motion_data[keyid][frame_ix],
+                            'text': text,
+                            'length': len(datastruct),
+                            'keyid': keyid,
+                            'bp-gpt': self.gpt_labels[keyid],
+                            'datastruct_a': self.motion_data[keyid][frame_ix],
+                            'datastruct_b': self.motion_data[keyid][frame_ix],
+                            'frames_ix': frame_ix,
+                        }
                 else:
-                    num_frames = self._num_frames_in_sequence[keyid]
-                    frame_ix = self.sampler(num_frames)
-                    datastruct = self._load_datastruct(keyid, frame_ix)                    
-                    element = {
-                        'datastruct': self.motion_data[keyid][frame_ix],
-                        'text': text,
-                        'length': len(datastruct),
-                        'keyid': keyid,
-                        'bp-gpt': self.gpt_labels[keyid],
-                        'datastruct_a': self.motion_data[keyid][frame_ix],
-                        'datastruct_b': self.motion_data[keyid][frame_ix],
-                        'frames_ix': frame_ix,
-                    }
-            else:
-                pass
+                    pass
 
         else:  # split or val
 
@@ -652,6 +685,15 @@ class BABEL(Dataset):
         return element
 
     def __getitem__(self, index):
+        if self.precomputed:
+            # Sample based on proportion using pre-computed indices
+            if np.random.uniform() < self.proportion_synthetic and self.synth_indices:
+                # Sample from synthetic data
+                index = np.random.choice(self.synth_indices)
+            elif self.non_synth_indices:
+                # Sample from non-synthetic data
+                index = np.random.choice(self.non_synth_indices)
+        
         keyid = self._split_index[index]
         return self.load_keyid(keyid, mode='train')
 

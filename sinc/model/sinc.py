@@ -380,6 +380,7 @@ class SINC(BaseModel):
         # gt_texts = batch['text']
         # gpt_parts = batch['bp-gpt']
         # if self.hparams.synthetic:
+        import ipdb;ipdb.set_trace()
         lens, motions_ds = self.transform_batch_to_mixed_synthetic(batch)
         del batch['datastruct_a']
         del batch['datastruct_b']
