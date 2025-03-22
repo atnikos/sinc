@@ -18,6 +18,7 @@ synthetic: ${data.synthetic}
 motion_branch: true
 teacher_forcing: false
 separate_latents: false
+precomputed: ${data.precomputed}
 
 # concatenating text branches or not
 single_text_desc: true

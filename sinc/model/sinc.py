@@ -29,6 +29,7 @@ class SINC(BaseModel):
                  vae: bool,
                  latent_dim: int,
                  motion_branch: bool,
+                 precomputed: bool,
                  separate_latents: Optional[bool] = False,
                  nvids_to_save: Optional[int] = None,
                  teacher_forcing: Optional[bool] = False,
@@ -41,7 +42,7 @@ class SINC(BaseModel):
         self.textencoder = instantiate(textencoder, nfeats=nfeats)
         if motion_branch:
             self.motionencoder = instantiate(motionencoder, nfeats=nfeats)
-
+        self.precomputed = precomputed
         self.transforms = instantiate(transforms)
         self.Datastruct = self.transforms.Datastruct
         self.motiondecoder = instantiate(motiondecoder, nfeats=nfeats)
@@ -135,6 +136,12 @@ class SINC(BaseModel):
                                gpt_parts: Optional[List] = None, 
                                conjuct_word: Optional[str]=None) -> List[Tensor]:
         if self.single_text_desc:
+            if self.precomputed:
+                texts = [tuple(s.split(" while ")) 
+                         if isinstance(s, str) 
+                         and " while " in s 
+                         else s for s in texts]
+
             texts = self.rule_based_concat(texts, conjuct_word)
 
         if self.concat_text_word is not None:
@@ -347,11 +354,13 @@ class SINC(BaseModel):
     @torch.no_grad()
     def transform_batch_to_mixed_synthetic(self, batch):
         from sinc.tools.frank import combine_motions
+        # TODO
         motion_lst = []
         lens_mot = []
         self.transforms.rots2rfeats = self.transforms.rots2rfeats.to('cpu')
         for idx, x in enumerate(batch['datastruct_a']):
-            if 'synth' in batch['keyid'][idx]:
+
+            if 'synth' in batch['keyid'][idx] and not self.precomputed:
                 motion_a = self.transforms.rots2rfeats.inverse(batch['datastruct_a'][idx].detach().cpu())
                 motion_b = self.transforms.rots2rfeats.inverse(batch['datastruct_b'][idx].detach().cpu())
                
@@ -381,9 +390,12 @@ class SINC(BaseModel):
         # gpt_parts = batch['bp-gpt']
         # if self.hparams.synthetic:
         lens, motions_ds = self.transform_batch_to_mixed_synthetic(batch)
-        del batch['datastruct_a']
-        del batch['datastruct_b']
-        del batch['datastruct']
+        if 'datastruct_a' in batch:
+            del batch['datastruct_a']
+        if 'datastruct_b' in batch:
+            del batch['datastruct_b']
+        if 'datastruct' in batch:
+            del batch['datastruct']
         batch['datastruct'] = motions_ds.to(self.device)
         batch['length'] = lens
         
