@@ -319,7 +319,6 @@ class BABEL(Dataset):
                             gpt_labels[keyid].append(self.compute_heuristic(idx_of_mot,
                                                                             vars_bps))
                     else:
-                        
                         for a_t in texts_data[keyid]:
                             bp_list = text_list_to_bp(a_t, gpt_labels_full_sent)
                             # bp_list = text_to_bp(a_t, gpt_labels_full_sent)
@@ -331,6 +330,8 @@ class BABEL(Dataset):
                 motion_data_synth = {}
                 texts_data_synth = {}
                 durations_synth = {}
+                gpt_labels_synth = {}
+
                 for k, v in tqdm(precomputed_synth_data_raw.items()):
                     smpl_data_for_synth = {
                                 "poses":v['motion_combo']['rots'].float(),
@@ -342,7 +343,16 @@ class BABEL(Dataset):
                     features = self.transforms.rots2rfeats(smpl_data)
                     motion_data_synth[k] = features
                     texts_data_synth[k] = v['text']
+                    first_act, sec_act = v['text'].split('while')
+                    first_act = first_act.strip()
+                    sec_act = sec_act.strip()
+                    f_bpts = text_list_to_bp(first_act, gpt_labels_full_sent)
+                    s_bpts = text_list_to_bp(sec_act, gpt_labels_full_sent)
+                    gpt_labels_synth[k] = []
+                    gpt_labels_synth[k].append(f_bpts)
+                    gpt_labels_synth[k].append(s_bpts)
                     durations_synth[k] = features.shape[0]
+
             else:
                 # from a keyid, prepare what keyids is possible to be chosen
                 from sinc.info.joints import get_compat_matrix
@@ -434,6 +444,8 @@ class BABEL(Dataset):
             self.motion_data.update(motion_data_synth)
             self.texts_data.update(texts_data_synth)
             self._num_frames_in_sequence.update(durations_synth)
+            self.gpt_labels.update(gpt_labels_synth)
+
             # Update split index to include synthetic data
             self._split_index = list(self.motion_data.keys())
             # Update keyids to include synthetic data
@@ -443,7 +455,6 @@ class BABEL(Dataset):
             # Update synthetic and non-synthetic indices
             self.synth_indices = [i for i, keyid in enumerate(self._split_index) if keyid.startswith('sin_synth')]
             self.non_synth_indices = [i for i, keyid in enumerate(self._split_index) if not keyid.startswith('sin_synth')]
-
         # from hydra.utils import get_original_cwd
         # ddict = {}
         # for k, v in texts_data.items():
