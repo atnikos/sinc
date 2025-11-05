@@ -8,6 +8,7 @@
     <a href='https://arxiv.org/abs/2304.10417'>
     <img src='https://img.shields.io/badge/arxiv-report-red' alt='ArXiv PDF'>
     </a>
+    <a href="https://deepwiki.com/atnikos/sinc"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
     <a href='https://sinc.is.tue.mpg.de/' style='padding-left: 0.5rem;'>
     <img src='https://img.shields.io/badge/Project-Page-blue?style=flat&logo=Google%20chrome&logoColor=blue' alt='Project Page'>
     <a href="https://huggingface.co/spaces/atnikos/sinc-synthetic"  style='padding-left: 0.5rem;'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-orange'></a>
