@@ -33,8 +33,8 @@ class Joints2Jfeats(nn.Module):
             mean_path = Path(path) / "jfeats_mean.pt"
             std_path = Path(path) / "jfeats_std.pt"
 
-            self.register_buffer('mean', torch.load(mean_path))
-            self.register_buffer('std', torch.load(std_path))
+            self.register_buffer('mean', torch.load(mean_path, weights_only=True))
+            self.register_buffer('std', torch.load(std_path, weights_only=True))
 
     def normalize(self, features: Tensor) -> Tensor:
         if self.normalization:
